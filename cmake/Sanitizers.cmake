@@ -1,0 +1,16 @@
+function(add_santinizer_flags)
+    if(NOT ENABLE_SANITIZE_ADDR AND NOT ENABLE_SANITIZE_UNDEF)
+        return()
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_compile_options("-fno-omit-frame-pointer")
+        add_link_options("-fno-omit-frame-pointer")
+
+        if(ENABLE_SANITIZE_ADDR)
+            message(STATUS "Activating Address Sanitizer")
+            add_compile_options("-fsanitize=address")
+            add_link_options("-fsanitize=address")
+        endif()
+    endif()
+endfunction()
