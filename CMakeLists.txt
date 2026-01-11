@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.24...3.30)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 endif()
+
+#####                   Options                      #####
+option(USE_CONAN "Whether to use Conan." OFF)
+option(USE_VCPKG "Whether to use VCPKG." OFF)
+option(USE_CPM "Whether to use CPM." ON)
 project(SystemC_SoC VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,11 +14,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(BUILD_SHARED_LIBS OFF)
-
-#####                   Options                      #####
-option(USE_CONAN "Whether to use Conan." OFF)
-option(USE_VCPKG "Whether to use VCPKG." OFF)
-option(USE_CPM "Whether to use CPM." ON)
 
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZER "Enable Address and Undefined Sanitizers" OFF)
@@ -74,11 +74,23 @@ if(USE_CPM)
     )
 
     # SCC (SystemC Components)
+    # Tell SCC that SystemC is already available to prevent find_package() call
+    set(SystemC_FOUND TRUE CACHE BOOL "" FORCE)
+    set(SystemC_DIR "${SystemC_BINARY_DIR}" CACHE PATH "" FORCE)
+    set(SYSTEMC_TARGET_ARCH "linux64" CACHE STRING "" FORCE)
+    
+    # Disable SCC installation to prevent export target errors
+    set(SCC_INSTALL_COMPONENTS OFF CACHE BOOL "" FORCE)
+    
     CPMAddPackage(
         NAME scc
         GITHUB_REPOSITORY Minres/SystemC-Components
         GIT_TAG 2024.07
-        OPTIONS "BUILD_SCC_LIB_ONLY ON" "SC_WITH_PHASE_CALLBACKS OFF"
+        OPTIONS 
+            "BUILD_SCC_LIB_ONLY ON" 
+            "SC_WITH_PHASE_CALLBACKS OFF"
+            "CMAKE_SKIP_INSTALL_RULES ON" 
+        EXCLUDE_FROM_ALL YES
     )
 
     # Catch2
@@ -92,11 +104,6 @@ elseif(USE_CONAN OR USE_VCPKG)
         include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
     elseif(USE_VCPKG)
         message(STATUS "Using VCPKG for dependency management")
-        if(DEFINED ENV{VCPKG_ROOT})
-            include($ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
-        elseif(EXISTS "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
-            include("${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
-        endif()
     endif()
 
     find_package(nlohmann_json REQUIRED)
