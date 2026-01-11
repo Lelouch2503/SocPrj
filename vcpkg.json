@@ -1,0 +1,16 @@
+{
+    "name": "systemc-soc",
+    "version": "1.0.0",
+    "dependencies": [
+        "fmt",
+        "spdlog",
+        "nlohmann-json",
+        "cxxopts",
+        "yaml-cpp",
+        "boost-system",
+        "boost-date-time",
+        "catch2",
+        "systemc"
+    ],
+    "builtin-baseline": "40619a55c3e76dc4005c8d1b7395071471bb8b96"
+}

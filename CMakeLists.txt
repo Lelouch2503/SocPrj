@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.24...3.30) # Upgrade to 3.24 to use OVERRIDE features
-# For CMake 4.x compatibility with older dependencies
+cmake_minimum_required(VERSION 3.24...3.30)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 endif()
@@ -23,6 +22,7 @@ option(ENABLE_SANITIZE_UNDEF "Enable undefined behavior sanitizer." OFF)
 option(ENABLE_SANITIZE_LEAK "Enable leak sanitizer (GCC/Clang only)." OFF)
 option(ENABLE_SANITIZE_THREAD "Enable thread sanitizer (GCC/Clang only)." OFF)
 option(ENABLE_CMAKE_FORMAT "Enable cmake-format integration." OFF)
+option(ENABLE_TESTING "Enable test" OFF)
 
 #####                   CMake Modules                #####
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
@@ -32,91 +32,195 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
 #####                   Dependencies                  #####
-message(STATUS "Configuring dependencies...")
 
-# --- 1. Boost: Use system-installed version (Boost is too heavy to build from source) ---
-# User must install: sudo apt-get install libboost-all-dev (Linux)
-find_package(Boost REQUIRED COMPONENTS system date_time)
+if(USE_CPM)
+    message(STATUS "Using CPM for dependency management")
+    include(cmake/CPM.cmake)
 
-# --- 2. fmt: Automatically fetch and build (lightweight) ---
-message(STATUS "Fetching fmt...")
-FetchContent_Declare(
-    fmt
-    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG        10.2.1
-    GIT_SHALLOW    TRUE
-    OVERRIDE_FIND_PACKAGE # Magic: other libraries calling find_package(fmt) will use this instance
-)
-FetchContent_MakeAvailable(fmt)
+    # JSON
+    CPMAddPackage("gh:nlohmann/json#v3.11.3")
 
-# --- 3. spdlog: Automatically fetch and build (lightweight) ---
-message(STATUS "Fetching spdlog...")
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.13.0
-    GIT_SHALLOW    TRUE
-    OVERRIDE_FIND_PACKAGE
-)
-# Force spdlog to use the previously fetched fmt instead of building its own
-set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(spdlog)
+    # fmt
+    CPMAddPackage("gh:fmtlib/fmt#10.2.1")
 
-# --- 4. yaml-cpp: Automatically fetch and build (lightweight) ---
-message(STATUS "Fetching yaml-cpp...")
-FetchContent_Declare(
-    yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG        0.8.0
-    GIT_SHALLOW    TRUE
-    OVERRIDE_FIND_PACKAGE
-)
-# Disable yaml-cpp tests and tools to keep build lightweight
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(yaml-cpp)
+    # spdlog
+    CPMAddPackage(
+        NAME spdlog
+        GITHUB_REPOSITORY gabime/spdlog
+        GIT_TAG v1.13.0
+        OPTIONS "SPDLOG_FMT_EXTERNAL ON"
+    )
 
-# --- 5. Catch2: Testing framework ---
-message(STATUS "Fetching Catch2...")
-FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.5.2
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(Catch2)
+    # yaml-cpp
+    CPMAddPackage(
+        NAME yaml-cpp
+        GITHUB_REPOSITORY jbeder/yaml-cpp
+        GIT_TAG 0.8.0
+        OPTIONS "YAML_CPP_BUILD_TESTS OFF" "YAML_CPP_BUILD_TOOLS OFF"
+    )
 
-#####                   SystemC                       #####
-message(STATUS "Fetching SystemC from GitHub...")
-FetchContent_Declare(
-    SystemC
-    GIT_REPOSITORY https://github.com/accellera-official/systemc.git
-    GIT_TAG        2.3.4
-    GIT_SHALLOW    TRUE
-)
-# SystemC build options
-set(ENABLE_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
-set(ENABLE_ASSERTIONS ON CACHE BOOL "" FORCE)
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    # cxxopts
+    CPMAddPackage("gh:jarro2783/cxxopts#v3.1.1")
 
-FetchContent_MakeAvailable(SystemC)
+    # Boost
+    find_package(Boost REQUIRED COMPONENTS system date_time)
 
-#####                   SCC (SystemC-Components)      #####
-message(STATUS "Fetching SCC (SystemC-Components)...")
-FetchContent_Declare(
-    scc
-    GIT_REPOSITORY https://github.com/Minres/SystemC-Components.git
-    GIT_TAG        2024.07
-    GIT_SHALLOW    TRUE
-    # Patch to prevent SCC from searching SystemC via find_package
-    PATCH_COMMAND  sh -c "echo 'if(TARGET SystemC::systemc)\n  return()\nendif()' | cat - cmake/SystemCPackage.cmake > cmake/SystemCPackage.cmake.tmp && mv cmake/SystemCPackage.cmake.tmp cmake/SystemCPackage.cmake"
-)
-# SCC build options
-set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
-set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
-set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
+    # SystemC
+    CPMAddPackage(
+        NAME SystemC
+        GITHUB_REPOSITORY accellera-official/systemc
+        GIT_TAG 2.3.4
+        OPTIONS "ENABLE_PHASE_CALLBACKS OFF" "ENABLE_ASSERTIONS ON" "BUILD_TESTING OFF"
+    )
 
-FetchContent_MakeAvailable(scc)
+    # SCC (SystemC Components)
+    CPMAddPackage(
+        NAME scc
+        GITHUB_REPOSITORY Minres/SystemC-Components
+        GIT_TAG 2024.07
+        OPTIONS "BUILD_SCC_LIB_ONLY ON" "SC_WITH_PHASE_CALLBACKS OFF"
+    )
+
+    # Catch2
+    if(ENABLE_TESTING)
+        CPMAddPackage("gh:catchorg/Catch2#v3.5.2")
+    endif()
+
+elseif(USE_CONAN OR USE_VCPKG)
+    if(USE_CONAN)
+        message(STATUS "Using Conan for dependency management")
+        include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
+    elseif(USE_VCPKG)
+        message(STATUS "Using VCPKG for dependency management")
+        if(DEFINED ENV{VCPKG_ROOT})
+            include($ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
+        elseif(EXISTS "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
+            include("${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
+        endif()
+    endif()
+
+    find_package(nlohmann_json REQUIRED)
+    find_package(fmt REQUIRED)
+    find_package(spdlog REQUIRED)
+    find_package(cxxopts REQUIRED)
+    find_package(yaml-cpp REQUIRED)
+    find_package(Boost REQUIRED COMPONENTS system date_time)
+    find_package(SystemC REQUIRED)
+
+    # SCC
+    find_package(SCC QUIET)
+    if(NOT SCC_FOUND)
+        message(WARNING "SCC not found via package manager. Fallback to FetchContent/CPM recommended here.")
+        message(STATUS "Fetching SCC (SystemC-Components)...")
+        FetchContent_Declare(
+            scc
+            GIT_REPOSITORY https://github.com/Minres/SystemC-Components.git
+            GIT_TAG        2024.07
+            GIT_SHALLOW    TRUE
+            PATCH_COMMAND  sh -c "echo 'if(TARGET SystemC::systemc)\n  return()\nendif()' | cat - cmake/SystemCPackage.cmake > cmake/SystemCPackage.cmake.tmp && mv cmake/SystemCPackage.cmake.tmp cmake/SystemCPackage.cmake"
+        )
+        set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
+        set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
+        set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
+
+        FetchContent_MakeAvailable(scc)
+    endif()
+
+    if(ENABLE_TESTING)
+        find_package(Catch2 REQUIRED)
+        if(Catch2_SOURCE_DIR)
+            list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+        endif()
+    endif()
+
+else()
+    FetchContent_Declare(
+        cxxopts
+        GIT_REPOSITORY https://github.com/jarro2783/cxxopts
+        GIT_TAG v3.1.1
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(cxxopts)
+
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json
+        GIT_TAG v3.11.3
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(nlohmann_json)
+
+    find_package(Boost REQUIRED COMPONENTS system date_time)
+
+    # fmt
+    FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG        10.2.1
+        GIT_SHALLOW    TRUE
+        OVERRIDE_FIND_PACKAGE
+    )
+    FetchContent_MakeAvailable(fmt)
+
+    # spdlog
+    FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        v1.13.0
+        GIT_SHALLOW    TRUE
+        OVERRIDE_FIND_PACKAGE
+    )
+    set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(spdlog)
+
+    # yaml-cpp
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG        0.8.0
+        GIT_SHALLOW    TRUE
+        OVERRIDE_FIND_PACKAGE
+    )
+    set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(yaml-cpp)
+
+    # Catch2
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.5.2
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+
+    # SystemC
+    FetchContent_Declare(
+        SystemC
+        GIT_REPOSITORY https://github.com/accellera-official/systemc.git
+        GIT_TAG        2.3.4
+        GIT_SHALLOW    TRUE
+    )
+    set(ENABLE_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_ASSERTIONS ON CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(SystemC)
+
+    # SCC (SystemC-Components)
+    FetchContent_Declare(
+        scc
+        GIT_REPOSITORY https://github.com/Minres/SystemC-Components.git
+        GIT_TAG        2024.07
+        GIT_SHALLOW    TRUE
+        PATCH_COMMAND  sh -c "echo 'if(TARGET SystemC::systemc)\n  return()\nendif()' | cat - cmake/SystemCPackage.cmake > cmake/SystemCPackage.cmake.tmp && mv cmake/SystemCPackage.cmake.tmp cmake/SystemCPackage.cmake"
+    )
+    set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
+    set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
+    set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(scc)
+
+endif()
+
 
 #####                   Compiler Options              #####
 if(ENABLE_SANITIZER)
