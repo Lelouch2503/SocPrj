@@ -6,7 +6,7 @@
 # Project related configuration options
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING       = UTF-8
-PROJECT_NAME            = "C++ Project Template"
+PROJECT_NAME            = "SocPrj"
 PROJECT_NUMBER          = 1.0.0
 PROJECT_BRIEF           =
 PROJECT_LOGO            =
@@ -35,3 +35,10 @@ FILE_PATTERNS          = *.c \
                          *.hpp \
                          *.md \
                          *.txt
+
+#---------------------------------------------------------------------------
+# Configuration options related to the dot tool
+#---------------------------------------------------------------------------
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES

@@ -8,8 +8,7 @@ target_include_directories(soc_peripherals PUBLIC
 
 target_link_libraries(soc_peripherals PUBLIC
     SystemC::systemc
-    scc-sysc
-    scc-util
+    scc::scc
     fmt::fmt
     spdlog::spdlog
 )

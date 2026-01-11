@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24...3.30)
+cmake_minimum_required(VERSION 3.20...3.30)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 endif()
@@ -29,6 +29,7 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 include(ConfigSafeGuards)
 include(AddGitSubmodule)
 include(FetchContent)
+include(Docs)
 set(FETCHCONTENT_QUIET OFF)
 
 #####                   Dependencies                  #####
@@ -41,7 +42,7 @@ if(USE_CPM)
     CPMAddPackage("gh:nlohmann/json#v3.11.3")
 
     # fmt
-    CPMAddPackage("gh:fmtlib/fmt#10.2.1")
+    CPMAddPackage("gh:fmtlib/fmt#9.1.0")
 
     # spdlog
     CPMAddPackage(
@@ -141,6 +142,11 @@ elseif(USE_CONAN OR USE_VCPKG)
     endif()
 
 else()
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+        set(FC_OVERRIDE_FIND_PACKAGE OVERRIDE_FIND_PACKAGE)
+    else()
+        set(FC_OVERRIDE_FIND_PACKAGE "")
+    endif()
     FetchContent_Declare(
         cxxopts
         GIT_REPOSITORY https://github.com/jarro2783/cxxopts
@@ -161,9 +167,9 @@ else()
     FetchContent_Declare(
         fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-        GIT_TAG        10.2.1
+        GIT_TAG        9.1.0
         GIT_SHALLOW    TRUE
-        OVERRIDE_FIND_PACKAGE
+        ${FC_OVERRIDE_FIND_PACKAGE}
     )
     FetchContent_MakeAvailable(fmt)
 
@@ -173,7 +179,7 @@ else()
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
         GIT_TAG        v1.13.0
         GIT_SHALLOW    TRUE
-        OVERRIDE_FIND_PACKAGE
+        ${FC_OVERRIDE_FIND_PACKAGE}
     )
     set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(spdlog)
@@ -184,7 +190,7 @@ else()
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
         GIT_TAG        0.8.0
         GIT_SHALLOW    TRUE
-        OVERRIDE_FIND_PACKAGE
+        ${FC_OVERRIDE_FIND_PACKAGE}
     )
     set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
