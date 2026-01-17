@@ -78,7 +78,12 @@ if(USE_CPM)
     # Tell SCC that SystemC is already available to prevent find_package() call
     set(SystemC_FOUND TRUE CACHE BOOL "" FORCE)
     set(SystemC_DIR "${SystemC_BINARY_DIR}" CACHE PATH "" FORCE)
-    set(SYSTEMC_TARGET_ARCH "linux64" CACHE STRING "" FORCE)
+
+    if(WIN32)
+        set(SYSTEMC_TARGET_ARCH "msvc64" CACHE STRING "" FORCE)
+    else()
+        set(SYSTEMC_TARGET_ARCH "linux64" CACHE STRING "" FORCE)
+    endif()
     
     # Disable SCC installation to prevent export target errors
     set(SCC_INSTALL_COMPONENTS OFF CACHE BOOL "" FORCE)
@@ -89,7 +94,7 @@ if(USE_CPM)
         GIT_TAG 2024.07
         OPTIONS 
             "BUILD_SCC_LIB_ONLY ON" 
-            "SC_WITH_PHASE_CALLBACKS OFF"
+            "SC_WITH_PHASE_CALLBACKS ON"
             "CMAKE_SKIP_INSTALL_RULES ON" 
         EXCLUDE_FROM_ALL YES
     )
