@@ -78,6 +78,8 @@ if(USE_CPM)
     # Tell SCC that SystemC is already available to prevent find_package() call
     set(SystemC_FOUND TRUE CACHE BOOL "" FORCE)
     set(SystemC_DIR "${SystemC_BINARY_DIR}" CACHE PATH "" FORCE)
+    # Ensure SystemC_FOUND is visible as a normal variable too
+    set(SystemC_FOUND TRUE)
 
     if(WIN32)
         set(SYSTEMC_TARGET_ARCH "msvc64" CACHE STRING "" FORCE)
@@ -93,10 +95,10 @@ if(USE_CPM)
         GITHUB_REPOSITORY Minres/SystemC-Components
         GIT_TAG 2024.07
         OPTIONS 
+            "SystemC_FOUND ON"
             "BUILD_SCC_LIB_ONLY ON" 
             "SC_WITH_PHASE_CALLBACKS ON"
             "CMAKE_SKIP_INSTALL_RULES ON" 
-        EXCLUDE_FROM_ALL YES
     )
 
     # Catch2
@@ -107,7 +109,7 @@ if(USE_CPM)
 elseif(USE_CONAN OR USE_VCPKG)
     if(USE_CONAN)
         message(STATUS "Using Conan for dependency management")
-        include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
+        # NOTE: conan_toolchain.cmake is passed via -DCMAKE_TOOLCHAIN_FILE
     elseif(USE_VCPKG)
         message(STATUS "Using VCPKG for dependency management")
     endif()
@@ -118,26 +120,33 @@ elseif(USE_CONAN OR USE_VCPKG)
     find_package(cxxopts REQUIRED)
     find_package(yaml-cpp REQUIRED)
     find_package(Boost REQUIRED COMPONENTS system date_time)
-    find_package(SystemC REQUIRED)
+    
+    # SystemC is NOT available on Conan, fetch from GitHub
+    message(STATUS "Fetching SystemC...")
+    FetchContent_Declare(
+        SystemC
+        GIT_REPOSITORY https://github.com/accellera-official/systemc.git
+        GIT_TAG        2.3.4
+        GIT_SHALLOW    TRUE
+    )
+    set(ENABLE_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_ASSERTIONS ON CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(SystemC)
 
-    # SCC
-    find_package(SCC QUIET)
-    if(NOT SCC_FOUND)
-        message(WARNING "SCC not found via package manager. Fallback to FetchContent/CPM recommended here.")
-        message(STATUS "Fetching SCC (SystemC-Components)...")
-        FetchContent_Declare(
-            scc
-            GIT_REPOSITORY https://github.com/Minres/SystemC-Components.git
-            GIT_TAG        2024.07
-            GIT_SHALLOW    TRUE
-            PATCH_COMMAND  sh -c "echo 'if(TARGET SystemC::systemc)\n  return()\nendif()' | cat - cmake/SystemCPackage.cmake > cmake/SystemCPackage.cmake.tmp && mv cmake/SystemCPackage.cmake.tmp cmake/SystemCPackage.cmake"
-        )
-        set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
-        set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
-        set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
-
-        FetchContent_MakeAvailable(scc)
-    endif()
+    # SCC (SystemC-Components) - also not on Conan
+    message(STATUS "Fetching SCC (SystemC-Components)...")
+    FetchContent_Declare(
+        scc
+        GIT_REPOSITORY https://github.com/Minres/SystemC-Components.git
+        GIT_TAG        2024.07
+        GIT_SHALLOW    TRUE
+        PATCH_COMMAND  sh -c "echo 'if(TARGET SystemC::systemc)\n  return()\nendif()' | cat - cmake/SystemCPackage.cmake > cmake/SystemCPackage.cmake.tmp && mv cmake/SystemCPackage.cmake.tmp cmake/SystemCPackage.cmake"
+    )
+    set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
+    set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
+    set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(scc)
 
     if(ENABLE_TESTING)
         find_package(Catch2 REQUIRED)
@@ -234,7 +243,8 @@ else()
     set(BUILD_SCC_LIB_ONLY ON CACHE BOOL "" FORCE)
     set(SC_WITH_PHASE_CALLBACKS OFF CACHE BOOL "" FORCE)
     set(SC_WITH_PHASE_CALLBACK_TRACING OFF CACHE BOOL "" FORCE)
-
+    
+    set(SystemC_FOUND TRUE)
     FetchContent_MakeAvailable(scc)
 
 endif()
